@@ -29,8 +29,6 @@ function Labeler(labels, colors, labeling_boxes) {
 
 	this.initialize() // настраиваем обработчики
 	this.labeling_boxes = labeling_boxes
-
-	this.add_entity(this.labeling_boxes[0])
 }
 
 // настройка обработчиков
@@ -110,7 +108,7 @@ Labeler.prototype.get_point = function(e) {
 }
 
 // создание bbox'а по начальной и конечной точкам и метки
-Labeler.prototype.get_box = function(startPoint, endPoint, label = "") {
+Labeler.prototype.get_box = function(startPoint, endPoint, label = "", text = "") {
 	// находим левую верхную точку
 	x = Math.min(startPoint.x, endPoint.x)
 	y = Math.min(startPoint.y, endPoint.y)
@@ -125,7 +123,8 @@ Labeler.prototype.get_box = function(startPoint, endPoint, label = "") {
 		x: x,
 		y: y,
 		width: width,
-		height: height
+		height: height,
+		text: text
 	}
 }
 
@@ -246,6 +245,7 @@ Labeler.prototype.show_entities = function() {
 			y: Math.floor(Math.max(0, this.entities[i].y / height * this.scale * IMAGE_HEIGHT)),
 			width: Math.floor(Math.min(this.entities[i].width / width * this.scale, 1) * IMAGE_WIDTH),
 			height: Math.floor(Math.min(this.entities[i].height / height * this.scale, 1) * IMAGE_HEIGHT),
+			text: this.entities[i].text
 		})
 	}
 
@@ -292,7 +292,7 @@ Labeler.prototype.boxes_hover = function(p) {
 }
 
 // начало выбора метки
-Labeler.prototype.start_labeling = function() {
+Labeler.prototype.start_labeling = function(text) {
 	let select = $('<select id="label-select"><option>Select label</option><option>skip</option><option>' + this.labels.join("</option><option>") + '</option></select>') // создаём выпадающий список с метками
 
 	select.appendTo(this.currBox) // добавляем его к текущему блоку
@@ -311,7 +311,7 @@ Labeler.prototype.start_labeling = function() {
 
 	// вызываем заверщение разметки при изменении метки
 	select.change(function() {
-		labeler.end_labeling(select)
+		labeler.end_labeling(select, text)
 	})
 
 	// добавляем возможность выбора метки по цифровой клавише
@@ -320,13 +320,13 @@ Labeler.prototype.start_labeling = function() {
 
 		if (Number.isInteger(option) && option >= 0 && option <= labeler.labels.length) { // если клавиша корректна
 			select.prop('selectedIndex', option + 1) // изменяем выбранный индекс
-			labeler.end_labeling(select) // и завершаем разметку
+			labeler.end_labeling(select, text) // и завершаем разметку
 		}
 	})
 }
 
 // завершение разметки
-Labeler.prototype.end_labeling = function(select) {
+Labeler.prototype.end_labeling = function(select, entity_text) {
 	let label = select.val() // получаем выбранную метку
 
 	if (label == "skip") {
@@ -348,7 +348,7 @@ Labeler.prototype.end_labeling = function(select) {
 		select.remove() // удаляем выпадающий список
 		text.appendTo(this.currBox) // добавляем текст к блоку
 
-		this.entities.push(this.get_box(this.startPoint, this.endPoint, label)) // добавляем bbox к массиву объектов
+		this.entities.push(this.get_box(this.startPoint, this.endPoint, label, entity_text)) // добавляем bbox к массиву объектов
 		this.entities_boxes.push(this.currBox) // добавляем блок к массиву блоков
 	}
 
@@ -478,7 +478,7 @@ Labeler.prototype.mouseup = function(e) {
 			return
 		}
 
-		this.start_labeling() // начинаем разметку
+		this.start_labeling("") // начинаем разметку
 	}
 
 	this.moveIndex = -1 // сбрасываем индекс перемещения
@@ -701,7 +701,7 @@ Labeler.prototype.add_entity = function(entity) {
 
 	this.startPoint = { x : new_entity.x, y : new_entity.y }
 	this.endPoint = {  x : new_entity.x + new_entity.width, y : new_entity.y + new_entity.height }
-	this.start_labeling() // начинаем разметку
+	this.start_labeling(entity.text) // начинаем разметку
 }
 
 // нажатие клавиши на клавиатуре

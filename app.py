@@ -67,13 +67,35 @@ def img2boxes(img):
 			continue
 			
 		box = dict()
-		box['bbox'] = [ x / width, y / height, w / width, h / height ]
+		box['bbox'] = [ x, y, w, h ]
 		box['text'] = ''
 
 		if d['level'][i] == 4:
 			boxes.append(box)
 
-	return boxes
+	for i in range(len(d['level'])):
+		if d['level'][i] != 5:
+			continue
+
+		box = d['left'][i], d['top'][i], d['width'][i], d['height'][i]
+
+		for j in range(len(boxes)):
+			if is_box_in(box, boxes[j]['bbox']):
+				if boxes[j]['text'] != '':
+					boxes[j]['text'] += ' '
+
+				boxes[j]['text'] += d['text'][i]
+
+	result_boxes = []
+	for box in boxes:
+		text = box['text']
+		x, y, w, h = box['bbox']
+
+		if not text.isspace():
+			box['bbox'] = [ x / width, y / height, w / width, h / height ]
+			result_boxes.append(box)
+
+	return result_boxes
 
 def make_labeler(filename, total, boxes, iw, ih):
 	initialize = "const init_boxes = ["
@@ -82,7 +104,7 @@ def make_labeler(filename, total, boxes, iw, ih):
 		label = 'text'
 		x, y, w, h = box['bbox']
 
-		initialize += "{ label: '" + label + "', x: " + str(x) + ", y: " + str(y) + ", width: " + str(w) + ", height: " + str(h) + " },\n"
+		initialize += "{ label: '" + label + "', x: " + str(x) + ", y: " + str(y) + ", width: " + str(w) + ", height: " + str(h) + ", text: \"" + box['text'].replace('"', "'") + "\" },\n"
 
 	initialize += "]\n"
 
@@ -124,7 +146,7 @@ def make_labeler(filename, total, boxes, iw, ih):
 			</div>
 
 			<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
-			<script src="js/labeler.js"></script>
+			<script src="js/labeler.js?v=4"></script>
 
 			<script type="text/javascript">
 				const IMAGE_WIDTH = {iw}
@@ -135,7 +157,7 @@ def make_labeler(filename, total, boxes, iw, ih):
 			   	{initialize}
 
 				var labeler = new Labeler(labels, colors, init_boxes)			   	
-
+	
 				$("#save-btn").click(function(e) {{
 					if (confirm("Saving: are you sure?")) {{
 						window.location.replace('/save?entities=' + $("#entities-data").text())
@@ -194,7 +216,7 @@ def save_file():
 	
 	os.replace(app.config['IMAGES_FOLDER'] + '/' + name, app.config['LABELS_FOLDER'] + '/' + name) # перемещаем изображение в папку размеченных изображений
 
-	with open(app.config['LABELS_FOLDER'] + '/' + name + '.json', 'w') as outfile:
+	with open(app.config['LABELS_FOLDER'] + '/' + name + '.json', 'w', encoding="utf-8") as outfile:
 		json.dump(data, outfile, indent=4) # сохраняем json с объектами
 
 	return redirect("/") # возвращаем на страницу разметки
