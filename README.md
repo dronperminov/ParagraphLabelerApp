@@ -9,16 +9,17 @@ Implementation of адфыл application for half automatic labeling paragraphs 
 ```python
 pytesseract.pytesseract.tesseract_cmd = r'C:/Program Files/Tesseract-OCR/tesseract' # путь к тессеракту
 ```
-* Move images for labeling to `images` folder
+* Move images for labeling to `data/images` folder
+* Start `initialize.py` script:
+```python
+python initialize.py
+```
 * Edit labels dictionary in `app.py` file for your task
 ```python
 labels = {
-	'header' : (255, 255, 0),
-	'bold text' : (255, 0, 0),
-	'italic text' : (255, 128, 0),
-	'text' : (200, 0, 0),
-	'table' : (0, 255, 0),
-	'picture' : (0, 0, 255),
+	'header': (255, 0, 0),
+	'text': (0, 255, 0),
+	'list': (0, 0, 255),
 }
 ```
 * Launch application using `python app.py`

@@ -1,31 +1,25 @@
 import os
+import os.path
 import random
 import json
 import cv2
 
-import pytesseract
-from pytesseract import Output
-
 from flask import Flask
 from flask import request, send_file, redirect, send_from_directory
 
-pytesseract.pytesseract.tesseract_cmd = r'C:/Program Files/Tesseract-OCR/tesseract' # путь к тессеракту
-
 app = Flask(__name__)
 	
-app.config['IMAGES_FOLDER'] = 'images' # папка с изображениями для разметки
-app.config['LABELS_FOLDER'] = 'labeled' # папка для сохраняемых изображений и разметок
+app.config['IMAGES_FOLDER'] = 'data/images' # папка с изображениями для разметки
+app.config['BBOXES_FOLDER'] = 'data/bboxes' # папка с bbox'ами для разметки
+app.config['LABELS_FOLDER'] = 'data/labeled' # папка для сохраняемых изображений и разметок
 app.config['JS_FOLDER'] = 'js' # папка с js кодом
 app.config['CSS_FOLDER'] = 'css' # папка со стилями
 
 # метки и соответствующие им цвета (BGR формат)
 labels = {
-	'header' : (255, 0, 0),
-	'bold text' : (255, 0, 0),
-	'italic text' : (255, 0, 0),
-	'text' : (255, 0, 0),
-	'table' : (0, 255, 0),
-	'picture' : (0, 0, 255),
+	'header': (255, 0, 0),
+	'text': (0, 255, 0),
+	'list': (0, 0, 255),
 }
 
 @app.route('/images/<filename>')
@@ -47,56 +41,6 @@ def get_labels_info():
 	info = [str(i + 1) + ' - ' + label for i, label in enumerate(labels.keys())]
 	return "0 - skip, " + str(info)[1:-1].replace("'", "")
 
-def is_box_in(box1, box2):
-	x1, y1, w1, h1 = box1
-	x2, y2, w2, h2 = box2
-
-	return (x1 >= x2) and (y1 >= y2) and (x1 + w1 <= x2 + w2) and (y1 + h1 <= y2 + h2)
-
-def img2boxes(img):
-	d = pytesseract.image_to_data(img, output_type=Output.DICT, lang='eng+rus')
-	boxes = []
-
-	height = img.shape[0]
-	width = img.shape[1]
-
-	for i in range(len(d['level'])):
-		x, y, w, h = d['left'][i], d['top'][i], d['width'][i], d['height'][i]
-
-		if (w < 5) or (h < 5):
-			continue
-			
-		box = dict()
-		box['bbox'] = [ x, y, w, h ]
-		box['text'] = ''
-
-		if d['level'][i] == 4:
-			boxes.append(box)
-
-	for i in range(len(d['level'])):
-		if d['level'][i] != 5:
-			continue
-
-		box = d['left'][i], d['top'][i], d['width'][i], d['height'][i]
-
-		for j in range(len(boxes)):
-			if is_box_in(box, boxes[j]['bbox']):
-				if boxes[j]['text'] != '':
-					boxes[j]['text'] += ' '
-
-				boxes[j]['text'] += d['text'][i]
-
-	result_boxes = []
-	for box in boxes:
-		text = box['text']
-		x, y, w, h = box['bbox']
-
-		if not text.isspace():
-			box['bbox'] = [ x / width, y / height, w / width, h / height ]
-			result_boxes.append(box)
-
-	return result_boxes
-
 def make_labeler(filename, total, boxes, iw, ih):
 	initialize = "const init_boxes = ["
 
@@ -112,7 +56,7 @@ def make_labeler(filename, total, boxes, iw, ih):
 		<!DOCTYPE html>
 		<html>
 		<head>
-			<title>Средство для разметки изображений</title>
+			<title>Средство для разметки строк текста на изображениях</title>
 			<meta charset="utf-8">
 			<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no" />
 			<link rel="stylesheet" href="css/labeler.css" />
@@ -160,7 +104,7 @@ def make_labeler(filename, total, boxes, iw, ih):
 	
 				$("#save-btn").click(function(e) {{
 					if (confirm("Saving: are you sure?")) {{
-						window.location.replace('/save?entities=' + $("#entities-data").text())
+						window.location.replace('/save?entities=' + $("#entities-data").text().replace(/(\\r\\n|\\n|\\r)/gm, ""))
 					}}
 				}})
 
@@ -180,8 +124,11 @@ def label_image():
 		return "Все изображения были размечены"
 
 	image = random.choice(images)
+	filename, extension = os.path.splitext(image)
+
 	img = cv2.imread(app.config['IMAGES_FOLDER'] + '/' + image)
-	boxes = img2boxes(img)
+	with open(app.config["BBOXES_FOLDER"] + '/' + filename + '.json', 'r', encoding="utf-8") as f:
+		boxes = json.load(f)["boxes"]
 
 	return make_labeler(image, len(images), boxes, img.shape[1], img.shape[0]) # иначе создаём страницу с интерфейсом для разметки
 
@@ -213,11 +160,11 @@ def save_file():
 	name = data['name'] # получаем имя изображения
 
 	draw_labeling(name.strip("/"), data) # отрисовываем результат разметки
-	
+
 	os.replace(app.config['IMAGES_FOLDER'] + '/' + name, app.config['LABELS_FOLDER'] + '/' + name) # перемещаем изображение в папку размеченных изображений
 
 	with open(app.config['LABELS_FOLDER'] + '/' + name + '.json', 'w', encoding="utf-8") as outfile:
-		json.dump(data, outfile, indent=4) # сохраняем json с объектами
+		json.dump(data, outfile, indent=4, ensure_ascii=False) # сохраняем json с объектами
 
 	return redirect("/") # возвращаем на страницу разметки
 
