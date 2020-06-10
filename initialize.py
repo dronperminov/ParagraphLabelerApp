@@ -6,16 +6,24 @@ import cv2
 from image_boxer import ImageBBoxer
 
 def main():
-    images_path = "data/images/"
-    bboxes_path = "data/bboxes/"
+    with open("config.json", encoding='utf-8') as f:
+        config = json.load(f)
 
-    if not os.path.exists(bboxes_path):
-        os.makedirs(bboxes_path)
+    images_dir = config["images_dir"]
+    bboxes_dir = config["bboxes_dir"]
 
-    images = os.listdir(images_path)
+    if not os.path.exists(images_dir):
+        print("images_dir '{0}' is not valid".format(images_dir))
+        return
 
-    for image in images:
-        img = cv2.imread(images_path + image)
+    if not os.path.exists(bboxes_dir):
+        os.makedirs(bboxes_dir)
+
+    images = os.listdir(images_dir)
+
+    for i, image in enumerate(images):
+        print("{0}/{1} ({2}): ".format(i + 1, len(images_dir + '/' + image), image), end='',)
+        img = cv2.imread(images_dir + '/' + image)
         boxes = ImageBBoxer().img2boxes(img)
 
         filename, extension = os.path.splitext(image)
@@ -27,8 +35,10 @@ def main():
             "boxes": boxes
         }
 
-        with open(bboxes_path + filename + ".json", "w", encoding="utf-8") as file:
+        with open(bboxes_dir + '/' + filename + ".json", "w", encoding="utf-8") as file:
             json.dump(result, file, indent=4, ensure_ascii=False)
+
+        print("done ({0} bboxes)".format(len(result["boxes"])))
 
 
 if __name__ == '__main__':

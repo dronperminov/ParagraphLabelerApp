@@ -7,20 +7,24 @@ import cv2
 from flask import Flask
 from flask import request, send_file, redirect, send_from_directory
 
+with open("config.json", encoding='utf-8') as f:
+	config = json.load(f)
+
+# метки и соответствующие им цвета (BGR формат)
+labels = config["labels"]
+
+for label in labels:
+	r, g, b = labels[label]
+	labels[label] = (b, g, r)
+
 app = Flask(__name__)
 	
-app.config['IMAGES_FOLDER'] = 'data/images' # папка с изображениями для разметки
-app.config['BBOXES_FOLDER'] = 'data/bboxes' # папка с bbox'ами для разметки
-app.config['LABELS_FOLDER'] = 'data/labeled' # папка для сохраняемых изображений и разметок
+app.config['IMAGES_FOLDER'] = config["images_dir"] # папка с изображениями для разметки
+app.config['BBOXES_FOLDER'] = config["bboxes_dir"] # папка с bbox'ами для разметки
+app.config['LABELS_FOLDER'] = config["output_dir"] # папка для сохраняемых изображений и разметок
 app.config['JS_FOLDER'] = 'js' # папка с js кодом
 app.config['CSS_FOLDER'] = 'css' # папка со стилями
 
-# метки и соответствующие им цвета (BGR формат)
-labels = {
-	'header': (255, 0, 0),
-	'text': (0, 255, 0),
-	'list': (0, 0, 255),
-}
 
 @app.route('/images/<filename>')
 def image_file(filename):
@@ -103,9 +107,7 @@ def make_labeler(filename, total, boxes, iw, ih):
 				var labeler = new Labeler(labels, colors, init_boxes)			   	
 	
 				$("#save-btn").click(function(e) {{
-					if (confirm("Saving: are you sure?")) {{
-						window.location.replace('/save?entities=' + $("#entities-data").text().replace(/(\\r\\n|\\n|\\r)/gm, ""))
-					}}
+					window.location.replace('/save?entities=' + $("#entities-data").text().replace(/(\\r\\n|\\n|\\r)/gm, ""))
 				}})
 
 				$("#skip-btn").click(function(e) {{
@@ -172,4 +174,4 @@ if __name__ == '__main__':
 	if not os.path.exists(app.config['LABELS_FOLDER']): # если папка с размеченными изображениями ещё не создана
 		os.makedirs(app.config['LABELS_FOLDER']) # создаём её
 
-	app.run(debug=True)
+	app.run(debug=True, port=config["port"])
